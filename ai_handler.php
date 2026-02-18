@@ -2,7 +2,7 @@
 header('Content-Type: application/json');
 
 // Allow from any origin for development purposes. In production, restrict this. 
-header('Access-Control-Allow-Origin: *'); 
+header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With');
 
@@ -26,7 +26,8 @@ $content = $input['content'];
 $instruction = $input['instruction'];
 
 // --- Function to call Gemini API ---
-function callGemini($apiKey, $content, $instruction) {
+function callGemini($apiKey, $content, $instruction)
+{
     $prompt = "Context: You are a professional editor. You will be provided with Markdown text and a specific instruction. 
 Respond ONLY with the modified Markdown text. Do not include explanations, preambles, or formatting backticks unless they are part of the markdown itself.
 
@@ -65,7 +66,8 @@ Content:
 }
 
 // --- Function to call OpenRouter API ---
-function callOpenRouter($apiKey, $content, $instruction, $model) {
+function callOpenRouter($apiKey, $content, $instruction, $model)
+{
     $system_prompt = "You are a professional editor. You will be provided with Markdown text and a specific instruction. Respond ONLY with the modified Markdown text. Do not include explanations, preambles, or formatting backticks unless they are part of the markdown itself.";
     $user_prompt = "Instruction: " . $instruction . "\n\nContent:\n" . $content;
 
@@ -83,7 +85,7 @@ function callOpenRouter($apiKey, $content, $instruction, $model) {
         'HTTP-Referer: ' . ($_SERVER['HTTP_HOST'] ?? 'localhost'), // Recommended by OpenRouter
         'X-Title: MarkFlow PDF Studio' // Recommended by OpenRouter
     ];
-    
+
     $ch = curl_init('https://openrouter.ai/api/v1/chat/completions');
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -100,7 +102,7 @@ function callOpenRouter($apiKey, $content, $instruction, $model) {
     }
 
     $responseData = json_decode($response, true);
-    
+
     if ($httpCode !== 200 || isset($responseData['error'])) {
         return ['error' => 'OpenRouter API error', 'details' => $responseData['error'] ?? $response, 'http_code' => $httpCode];
     }
@@ -112,23 +114,20 @@ function callOpenRouter($apiKey, $content, $instruction, $model) {
 // --- Main Logic ---
 $result = null;
 
+// Get API Key from request
+$apiKey = $input['apiKey'] ?? null;
+
+if (!$apiKey) {
+    http_response_code(400);
+    echo json_encode(['error' => 'API Key is required. Please set it in the settings.']);
+    exit();
+}
+
 if ($provider === 'openrouter') {
-    $apiKey = getenv('OPENROUTER_API_KEY');
-    if (!$apiKey) {
-        http_response_code(500);
-        echo json_encode(['error' => 'OpenRouter API Key not configured.']);
-        exit();
-    }
     // For now, hardcode a default free model. Later, this could come from the frontend.
     $model = $input['model'] ?? 'mistralai/mistral-7b-instruct:free';
     $result = callOpenRouter($apiKey, $content, $instruction, $model);
 } else { // Default to Gemini
-    $apiKey = getenv('GEMINI_API_KEY');
-    if (!$apiKey) {
-        http_response_code(500);
-        echo json_encode(['error' => 'Gemini API Key not configured.']);
-        exit();
-    }
     $result = callGemini($apiKey, $content, $instruction);
 }
 
@@ -141,4 +140,3 @@ if (isset($result['error'])) {
     http_response_code(500);
     echo json_encode(['error' => 'An unknown error occurred in the AI handler.']);
 }
-?>
